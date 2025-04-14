@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Pythagoreische Tripel Checker</title>
+  <!-- canvas-confetti Bibliothek hinzufügen -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+      overflow-x: hidden; /* Verhindert horizontales Scrollen, falls Konfetti zu breit fliegt */
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    .controls {
+      margin: 20px 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    input[type="number"] {
+      padding: 10px;
+      font-size: 16px;
+      width: 80px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      margin: 0 10px;
+    }
+
+    .checkbox-container {
+      display: flex;
+      align-items: center;
+      margin: 0 10px;
+    }
+
+    .result {
+      font-size: 18px;
+      font-weight: bold;
+      margin: 20px 0;
+      min-height: 30px;
+    }
+
+    .blue-result {
+      color: blue;
+    }
+
+    .red-result {
+      color: red;
+    }
+
+    .grid-container {
+      display: flex;
+      flex-wrap: wrap;
+      max-width: 1000px;
+      margin: 0 auto;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .number-box {
+      width: 40px;
+      height: 40px;
+      margin: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: white;
+      font-weight: bold;
+      transition: all 0.2s;
+      position: relative;
+      border-radius: 3px;
+    }
+
+    .red {
+      background-color: #ff5555;
+    }
+
+    .blue {
+      background-color: #5555ff;
+    }
+
+    .gray {
+      background-color: #cccccc;
+      color: #666666;
+      cursor: default; /* Graue Kästchen sind nicht klickbar */
+    }
+
+    .highlighted {
+      transform: scale(1.1);
+      z-index: 5;
+      box-shadow: 0 0 8px 2px rgba(255, 215, 0, 0.8);
+      outline: 2px solid #FFD700;
+    }
+
+    /* CSS für altes Konfetti entfernt */
+
+  </style>
+</head>
+<body>
+  <h1>Pythagoreische Tripel Checker</h1>
+  <div class="controls">
+    <div class="control-group">
+      <label for="totalNumbers">Anzahl Kästchen: </label>
+      <input type="number" id="totalNumbers" min="10" max="1000" value="200">
+    </div>
+    <button id="randomize">Zufällige Färbung</button>
+    <div class="checkbox-container">
+      <input type="checkbox" id="hideNonTriplets">
+      <label for="hideNonTriplets">Nicht-Tripel-Zahlen hellgrau</label>
+    </div>
+  </div>
+  <div id="tripletResult" class="result">Suche nach pythagoreischen Tripeln...</div>
+  <div class="grid-container" id="grid"></div>
+  <!-- Konfetti-Container entfernt -->
+
+  <script>
+    let totalNumbers = 200;
+    let boxes = [];
+    let allTripletNumbers = new Set();
+    // Variablen für altes Konfetti entfernt
+    let lastResult = null;
+
+    // Initialisierung
+    function initialize() {
+      // Hole die aktuelle Anzahl aus dem Eingabefeld
+      totalNumbers = parseInt(document.getElementById('totalNumbers').value) || 200;
+
+      // Begrenze auf sinnvolle Werte
+      if (totalNumbers < 10) totalNumbers = 10;
+      if (totalNumbers > 1000) totalNumbers = 1000;
+      document.getElementById('totalNumbers').value = totalNumbers;
+
+      const grid = document.getElementById('grid');
+      grid.innerHTML = '';
+      boxes = [];
+
+      // Berechne alle möglichen pythagoreischen Tripel bis zur maximalen Zahl
+      allTripletNumbers = new Set();
+      getAllPossibleTripletNumbers(totalNumbers);
+
+      // Erstelle alle Kästchen von 1 bis totalNumbers
+      for (let i = 1; i <= totalNumbers; i++) {
+        const box = document.createElement('div');
+        const color = Math.random() < 0.5 ? 'red' : 'blue';
+
+        box.className = `number-box ${color}`;
+        box.textContent = i;
+        box.dataset.number = i;
+        box.dataset.color = color;
+
+        box.addEventListener('click', () => toggleColor(box));
+
+        grid.appendChild(box);
+        boxes.push(box);
+      }
+
+      updateNonTripletDisplay(); // Update display based on checkbox and triplets
+      checkForPythagoreanTriplets(); // Initial check
+    }
+
+    // Berechne alle Zahlen, die in irgendeinem pythagoreischen Tripel vorkommen
+    function getAllPossibleTripletNumbers(max) {
+      allTripletNumbers.clear(); // Ensure set is empty before recalculating
+      for (let a = 1; a <= max; a++) {
+        // Beginne b bei a, um Duplikate (a,b) vs (b,a) zu vermeiden
+        for (let b = a; ; b++) {
+          const cSquared = a*a + b*b;
+          const c = Math.sqrt(cSquared);
+
+          if (c > max) {
+              // Wenn c > max ist, brauchen wir für dieses 'a' kein größeres 'b' mehr zu prüfen
+              break;
+          }
+
+          if (c === Math.floor(c)) { // Prüfen, ob c eine ganze Zahl ist
+             // Füge a, b, und c hinzu, wenn alle <= max sind
+             // Da c <= max bereits geprüft wurde und a <= b gilt, ist a auch <= max
+             // Wir müssen nur noch sicherstellen, dass b <= max ist (könnte theoretisch größer sein wenn a klein ist)
+             if (b <= max) {
+                allTripletNumbers.add(a);
+                allTripletNumbers.add(b);
+                allTripletNumbers.add(c);
+             } else {
+                 // Wenn b > max, brauchen wir für dieses 'a' kein größeres 'b' mehr zu prüfen
+                 break;
+             }
+          }
+        }
+      }
+    }
+
+    // Wechsle die Farbe eines Kästchens
+    function toggleColor(box) {
+      const currentColor = box.dataset.color;
+      if (currentColor === 'gray') return; // Graue Kästchen können nicht umgefärbt werden
+
+      const newColor = currentColor === 'red' ? 'blue' : 'red';
+
+      box.classList.remove(currentColor);
+      box.classList.add(newColor);
+      box.dataset.color = newColor;
+
+      // Entferne Hervorhebungen
+      boxes.forEach(b => b.classList.remove('highlighted'));
+
+      checkForPythagoreanTriplets();
+    }
+
+    // Aktualisiere die Darstellung der nicht-Tripel-Zahlen
+    function updateNonTripletDisplay() {
+      const hideNonTriplets = document.getElementById('hideNonTriplets').checked;
+
+      boxes.forEach(box => {
+        const num = parseInt(box.dataset.number);
+        const isTripletMember = allTripletNumbers.has(num);
+        const isCurrentlyGray = box.classList.contains('gray');
+        const currentNonGrayColor = box.classList.contains('red') ? 'red' : (box.classList.contains('blue') ? 'blue' : null);
+
+        if (hideNonTriplets && !isTripletMember) {
+          // Mache es grau, wenn es nicht bereits grau ist
+          if (!isCurrentlyGray) {
+            box.classList.remove('red', 'blue');
+            box.classList.add('gray');
+            box.dataset.color = 'gray'; // Wichtig: internen Status aktualisieren
+            // Speichere die ursprüngliche Farbe, falls vorhanden
+            if (currentNonGrayColor) {
+                box.dataset.originalColor = currentNonGrayColor;
+            }
+          }
+        } else if ((!hideNonTriplets || isTripletMember) && isCurrentlyGray) {
+          // Mache es wieder farbig, wenn "Ausblenden" deaktiviert ist ODER es ein Tripelmitglied ist
+          // UND es aktuell grau ist
+          const originalColor = box.dataset.originalColor || (Math.random() < 0.5 ? 'red' : 'blue'); // Wiederherstellen oder zufällig zuweisen
+          box.classList.remove('gray');
+          box.classList.add(originalColor);
+          box.dataset.color = originalColor; // Wichtig: internen Status aktualisieren
+          delete box.dataset.originalColor; // Gespeicherte Farbe entfernen
+        }
+         // Ansonsten: Farbe bleibt wie sie ist
+      });
+    }
+
+
+    // Überprüfe ob pythagoreische Tripel existieren - KORRIGIERTE VERSION
+    function checkForPythagoreanTriplets() {
+      // Filtere nur die NICHT-grauen Kästchen für die Tripel-Suche
+      const blueNumbers = boxes.filter(box => box.dataset.color === 'blue')
+                             .map(box => parseInt(box.dataset.number));
+      const redNumbers = boxes.filter(box => box.dataset.color === 'red')
+                           .map(box => parseInt(box.dataset.number));
+
+      // Entferne alle Hervorhebungen
+      boxes.forEach(box => box.classList.remove('highlighted'));
+
+      const resultElement = document.getElementById('tripletResult');
+      resultElement.className = 'result'; // Reset classes
+
+      // Finde alle Tripel
+      const blueTriplets = findAllPythagoreanTriplets(blueNumbers);
+      const redTriplets = findAllPythagoreanTriplets(redNumbers);
+
+      // Sortiere nach dem kleinsten Wert im Tripel
+      blueTriplets.sort((a, b) => Math.min(...a) - Math.min(...b));
+      redTriplets.sort((a, b) => Math.min(...a) - Math.min(...b));
+
+      // Identifiziere das potenziell kleinste Tripel jeder Farbe
+      const bestBlueTriplet = blueTriplets.length > 0 ? blueTriplets[0] : null;
+      const bestRedTriplet = redTriplets.length > 0 ? redTriplets[0] : null;
+
+      let tripletToShow = null;
+      let colorToShow = null;
+
+      // Vergleiche die kleinsten Tripel, falls beide Farben welche haben
+      if (bestBlueTriplet && bestRedTriplet) {
+          const minBlue = Math.min(...bestBlueTriplet);
+          const minRed = Math.min(...bestRedTriplet);
+
+          // Wähle das Tripel mit der absolut kleinsten Zahl
+          if (minBlue <= minRed) { // Bei Gleichstand wird Blau bevorzugt
+              tripletToShow = bestBlueTriplet;
+              colorToShow = 'blue';
+          } else {
+              tripletToShow = bestRedTriplet;
+              colorToShow = 'red';
+          }
+      } else if (bestBlueTriplet) {
+          // Nur blaue Tripel gefunden
+          tripletToShow = bestBlueTriplet;
+          colorToShow = 'blue';
+      } else if (bestRedTriplet) {
+          // Nur rote Tripel gefunden
+          tripletToShow = bestRedTriplet;
+          colorToShow = 'red';
+      }
+
+      // Zeige das Ergebnis an
+      if (tripletToShow) {
+          resultElement.textContent = `${tripletToShow[0]}² + ${tripletToShow[1]}² = ${tripletToShow[2]}²`;
+          resultElement.classList.add(colorToShow === 'blue' ? 'blue-result' : 'red-result');
+          highlightNumbers(tripletToShow);
+          lastResult = "found";
+      } else {
+          // Kein Tripel gefunden
+          resultElement.textContent = 'Keine einfarbigen pythagoreischen Tripel gefunden. 🎉';
+          // Nur Konfetti starten, wenn sich der Status von "gefunden" zu "nicht gefunden" ändert
+          if (lastResult === "found" || lastResult === null) { // Auch beim ersten Mal starten, wenn direkt keine gefunden werden
+              confetti({
+                  particleCount: 150, // Anzahl der Partikel
+                  spread: 80,         // Streuungswinkel
+                  origin: { y: 0.6 }, // Startpunkt etwas unterhalb der Mitte oben
+                  colors: ['#ff5555', '#5555ff', '#ffd700', '#ffffff', '#4caf50'], // Farben angepasst (Rot, Blau, Gelb, Weiß, Grün)
+                  zIndex: 1050        // Sicherstellen, dass es über anderen Elementen liegt
+              });
+          }
+          lastResult = "not-found";
+      }
+    }
+
+
+    // Finde alle pythagoreischen Tripel in einer Liste von Zahlen
+    function findAllPythagoreanTriplets(numbers) {
+      const triplets = [];
+      const numberSet = new Set(numbers); // Effizientere Suche mit Set
+
+      // Optimierung: Wenn weniger als 3 Zahlen, kann es kein Tripel geben
+      if (numbers.length < 3) return triplets;
+
+      // Sortiere die Zahlen aufsteigend - wichtig für Optimierungen
+      numbers.sort((a, b) => a - b);
+
+      const maxNumInList = numbers[numbers.length - 1]; // Größte Zahl in der *aktuellen* Liste
+
+      // Überprüfe jede mögliche Kombination
+      for (let i = 0; i < numbers.length - 1; i++) { // a läuft bis zum vorletzten Element
+        const a = numbers[i];
+
+        // Optimierung: Wenn a*a + a*a (kleinstmögliches b=a) schon größer als maxNumInList^2 ist,
+        // dann können größere 'a' erst recht keine Tripel mehr bilden.
+        if (2 * a * a > maxNumInList * maxNumInList) {
+             break; // Frühzeitiger Abbruch der äußeren Schleife
+        }
+
+        for (let j = i + 1; j < numbers.length; j++) { // b läuft ab dem Element nach a
+          const b = numbers[j];
+          const cSquared = a*a + b*b;
+
+           // Optimierung: Wenn c^2 schon größer als maxNumInList^2 ist,
+           // brauchen wir für dieses 'a' mit größeren 'b' nicht weiterzusuchen.
+           if (cSquared > maxNumInList * maxNumInList) {
+               break; // Frühzeitiger Abbruch der inneren Schleife für dieses 'a'
+           }
+
+          const c = Math.sqrt(cSquared);
+
+          // Überprüfe, ob c eine ganze Zahl ist UND im Set der übergebenen Zahlen existiert
+          if (c === Math.floor(c) && numberSet.has(c)) {
+            // Es ist wichtig, dass c > b ist, um sicherzustellen, dass c die Hypotenuse ist
+            // und wir nicht versehentlich (a, c, b) finden, falls c < b.
+            // Da die Liste sortiert ist, ist dies nicht streng notwendig, aber schadet nicht.
+             if (c > b) {
+               triplets.push([a, b, c]);
+             }
+          }
+        }
+      }
+
+      return triplets;
+    }
+
+    // Hebe die angegebenen Zahlen im Grid hervor
+    function highlightNumbers(numbers) {
+      boxes.forEach(box => {
+        const num = parseInt(box.dataset.number);
+        if (numbers.includes(num)) {
+          box.classList.add('highlighted');
+        }
+      });
+    }
+
+    // Event-Listener
+    document.getElementById('randomize').addEventListener('click', () => {
+      // Nur nicht-graue Kästchen neu färben
+      boxes.forEach(box => {
+        if (box.dataset.color !== 'gray') {
+          const color = Math.random() < 0.5 ? 'red' : 'blue';
+          box.classList.remove('red', 'blue'); // Entferne beide möglichen Farben
+          box.classList.add(color);
+          box.dataset.color = color;
+        }
+      });
+
+      checkForPythagoreanTriplets(); // Nach dem Neu-Färben prüfen
+    });
+
+    // Direktes Anwenden bei Änderung der Anzahl
+    document.getElementById('totalNumbers').addEventListener('change', initialize);
+    // Optional: Verzögertes Update bei Tippen im Input-Feld
+    let inputTimeout = null;
+    document.getElementById('totalNumbers').addEventListener('input', function() {
+      clearTimeout(inputTimeout);
+      inputTimeout = setTimeout(initialize, 500); // 500ms warten nach letzter Eingabe
+    });
+
+    document.getElementById('hideNonTriplets').addEventListener('change', () => {
+        updateNonTripletDisplay(); // Zuerst Farben/Grau anpassen
+        checkForPythagoreanTriplets(); // Dann neu prüfen, ob Tripel existieren/gefunden werden
+    });
+
+    // Initialisiere die App beim Laden
+    initialize();
+  </script>
+</body>
+</html>
